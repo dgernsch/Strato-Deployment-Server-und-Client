@@ -4,7 +4,7 @@
 Hier musst du das setup_server.sh ausführen. Das machst du nur ein einziges Mal, um den Server vorzubereiten.
 
 Schritt-für-Schritt:
-
+## Server
 Einloggen: Geh in deinen Container (über Proxmox Konsole oder lxc-attach).
 
 ``` Bash
@@ -13,7 +13,6 @@ Einloggen: Geh in deinen Container (über Proxmox Konsole oder lxc-attach).
     git clone https://github.com/dgernsch/Strato-Deployment-Server-und-Client
     git checkout client
 ```
-Bash
 
 Ausführbar machen (Wichtig!): Gib diesen Befehl ein, damit Linux weiß, dass es ein Programm ist:
 
@@ -26,8 +25,7 @@ Starten:
 2. Auf deinem Mac (Client)
 Hier nutzt du das deploy.sh. Das machst du jedes Mal, wenn du eine Webseite hochladen willst.
 
-Schritt-für-Schritt:
-
+## Cliene
 ``` Bash
     git clone https://github.com/dgernsch/Strato-Deployment-Server-und-Client
     git checkout client
@@ -36,21 +34,20 @@ Schritt-für-Schritt:
 chmod +x deploy.sh
 Starten (Beispiel): Angenommen, dein HTML-Code liegt im Ordner dist, du willst es shop nennen und die IP ist 192.168.178.34:
 
-Bash
 
 ./deploy.sh ./dist $Name 192.x.x.x deine lokale IP adresse
 👉 Ergebnis: Dein Mac lädt die Dateien hoch und die Webseite ist online.
 
 
-# Strato
+## Strato
 sub domain erstellen
 A Record public IP
 DYN dns einstellen
 
-# Nginx Proxymanager
+## Nginx Proxymanager
 neues SSL Zertifikat erstellen
 
-# Ergebnis
+## Ergebnis
 Öffne nun deine seite unter domain/$Name
 
 Zusammenfassung der Befehle
