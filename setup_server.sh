@@ -1,41 +1,66 @@
 #!/bin/bash
 
-# --- BENUTZUNG ---
-# ./deploy.sh [LOKALER_ORDNER] [ZIEL_NAME] [SERVER_IP]
+# Prüfen ob Root
+if [ "$EUID" -ne 0 ]; then
+  echo "❌ Bitte als root ausführen."
+  exit 1
+fi
 
-LOCAL_DIST=$1
-REMOTE_NAME=$2
-SERVER_IP=$3
-USER="root"
+echo "🔧 [1/3] Installiere Apache & Tools..."
+apt-get update -q
+apt-get install -y apache2 nano -q
 
-# 1. Parameter prüfen
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-    echo "❌ Fehler: Fehlende Parameter."
-    echo "-------------------------------------------------------"
-    echo "Benutzung: ./deploy.sh [DIST_ORDNER] [NAME] [IP]"
-    echo "Beispiel:  ./deploy.sh ./dist tetris 192.168.178.34"
-    echo "-------------------------------------------------------"
+echo "🔑 [2/3] Erlaube SSH Root-Login..."
+# Erlaubt Root-Login und Passwort-Login für SCP
+sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart ssh
+
+echo "🛠️ [3/3] Erstelle Befehl 'create_site'..."
+# Wir erstellen ein globales Script, damit du später einfach 'create_site name' tippen kannst
+cat << 'EOF' > /usr/local/bin/create_site
+#!/bin/bash
+if [ -z "$1" ]; then
+    echo "Benutzung: create_site [NAME_DER_SEITE]"
     exit 1
 fi
+NAME=$1
+WEB_ROOT="/var/www/html/$NAME"
+CONF="/etc/apache2/sites-available/$NAME.conf"
 
-# 2. Prüfen ob lokaler Ordner existiert
-if [ ! -d "$LOCAL_DIST" ]; then
-    echo "❌ Fehler: Ordner '$LOCAL_DIST' nicht gefunden."
-    exit 1
+echo "⚙️ Erstelle Seite: $NAME"
+mkdir -p "$WEB_ROOT"
+
+# Dummy Index, falls Ordner leer
+if [ ! -f "$WEB_ROOT/index.html" ]; then
+    echo "<h1>$NAME wartet auf Upload</h1>" > "$WEB_ROOT/index.html"
 fi
 
-TARGET_DIR="/var/www/html/$REMOTE_NAME"
+# Apache Config (für alles: Vue, React, Rust/WASM)
+cat <<CONFIG > "$CONF"
+<VirtualHost *:80>
+    DocumentRoot $WEB_ROOT
+    ErrorLog \${APACHE_LOG_DIR}/${NAME}_error.log
+    CustomLog \${APACHE_LOG_DIR}/${NAME}_access.log combined
+    <Directory $WEB_ROOT>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+        # Wichtig für Rust Apps
+        AddType application/wasm .wasm
+        # Wichtig für Vue/React Router (History Mode)
+        FallbackResource /index.html
+    </Directory>
+</VirtualHost>
+CONFIG
 
-echo "🚀 Lade '$LOCAL_DIST' auf $SERVER_IP ($REMOTE_NAME) hoch..."
+chown -R www-data:www-data "$WEB_ROOT"
+a2ensite "$NAME.conf" > /dev/null
+systemctl reload apache2
+echo "✅ Fertig! Zielordner: $WEB_ROOT"
+EOF
 
-# 3. Upload
-# Der Stern * sorgt dafür, dass der INHALT hochgeladen wird, nicht der Ordner selbst.
-scp -r "$LOCAL_DIST/"* $USER@$SERVER_IP:$TARGET_DIR/
+chmod +x /usr/local/bin/create_site
 
-if [ $? -eq 0 ]; then
-    echo "🧹 Berechtigungen reparieren..."
-    ssh $USER@$SERVER_IP "chown -R www-data:www-data $TARGET_DIR"
-    echo "✅ FERTIG! Online unter: http://$SERVER_IP/$REMOTE_NAME"
-else
-    echo "❌ Upload fehlgeschlagen."
-fi
+echo "✅ SERVER FERTIG EINGERICHTET!"
+echo "👉 Du kannst jetzt z.B. 'create_site portfolio' eingeben."
